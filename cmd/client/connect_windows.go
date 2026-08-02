@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -63,4 +64,5 @@ func runConnect(serverAddr, sessionID string) {
 	case <-stdinDone:
 		<-done
 	}
+	time.Sleep(200 * time.Millisecond)
 }

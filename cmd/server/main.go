@@ -293,18 +293,6 @@ func (s *Server) handleShare(sshConn *ssh.ServerConn, chans <-chan ssh.NewChanne
 }
 
 func (s *Server) handleConnect(sshConn *ssh.ServerConn, chans <-chan ssh.NewChannel, sessionID string) {
-	val, ok := s.sessions.Load(sessionID)
-	if !ok {
-		log.Printf("[!] Session not found: %s", sessionID)
-		return
-	}
-
-	sess := val.(*Session)
-	if sess.closed.Load() {
-		log.Printf("[!] Session already closed: %s", sessionID)
-		return
-	}
-
 	for newChannel := range chans {
 		if newChannel.ChannelType() != "session" {
 			newChannel.Reject(ssh.UnknownChannelType, "unsupported channel type")
@@ -316,6 +304,22 @@ func (s *Server) handleConnect(sshConn *ssh.ServerConn, chans <-chan ssh.NewChan
 			log.Printf("[!] Accept operator channel error: %v", err)
 			return
 		}
+
+		val, ok := s.sessions.Load(sessionID)
+		if !ok {
+			log.Printf("[!] Session not found: %s", sessionID)
+			s.writeOpReason(channel, "Session not found. Start a new share first (swagssh share).")
+			channel.Close()
+			return
+		}
+		sess := val.(*Session)
+		if sess.closed.Load() {
+			log.Printf("[!] Session already closed: %s", sessionID)
+			s.writeOpReason(channel, "Session is closed. Start a new share first (swagssh share).")
+			channel.Close()
+			return
+		}
+
 		go s.handleOperatorRequests(sess, requests)
 
 		log.Printf("[+] Operator connected to session %s from %s", sessionID, sshConn.RemoteAddr())
@@ -328,16 +332,24 @@ func (s *Server) handleConnect(sshConn *ssh.ServerConn, chans <-chan ssh.NewChan
 			<-handoff.done
 			return
 		case <-sess.done:
-			channel.Write([]byte("\033[1;31mSession ended\033[0m\n"))
+			s.writeOpReason(channel, "Session ended.")
 			channel.Close()
 			return
 		case <-time.After(10 * time.Second):
-			channel.Write([]byte("\033[1;31mConnection timed out\033[0m\n"))
+			s.writeOpReason(channel, "Handshake timed out.")
 			channel.Close()
 			return
 		}
 		return
 	}
+}
+
+func (s *Server) writeOpReason(ch ssh.Channel, reason string) {
+	msg := fmt.Sprintf("\r\n\033[1;33m[swagSSH] \033[0m%s\r\n", reason)
+	if _, err := ch.Write([]byte(msg)); err != nil {
+		return
+	}
+	time.Sleep(200 * time.Millisecond)
 }
 
 func (s *Server) handleOperatorRequests(sess *Session, requests <-chan *ssh.Request) {
@@ -385,7 +397,9 @@ func (s *Server) bridge(sess *Session, handoff operatorHandoff) {
 	select {
 	case <-opDone:
 	case <-shareDone:
+		s.writeOpReason(opChannel, "Session disconnected: the share side went away.")
 	case <-sess.done:
+		s.writeOpReason(opChannel, "Session ended.")
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -94,6 +95,13 @@ func runShare(serverAddr string) {
 		log.Fatalf("Failed to start PTY: %v", err)
 	}
 	defer ptyRW.Close()
+
+	if runtime.GOOS == "windows" {
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			ptyRW.Write([]byte("echo Welcome to swagSSH! Type 'exit' to end this session. & cd /d \"%CD%\"\r\n"))
+		}()
+	}
 
 	errCh := make(chan error, 2)
 

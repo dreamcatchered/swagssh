@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
@@ -95,6 +96,7 @@ func runConnect(serverAddr, sessionID string) {
 		}
 		<-done
 	}
+	time.Sleep(200 * time.Millisecond)
 }
 
 func initWindowSize(fd int, client *ssh.Client) {

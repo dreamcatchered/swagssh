@@ -4,7 +4,6 @@ go 1.22
 
 require (
 	github.com/creack/pty v1.1.24
-	github.com/aymanbagabas/go-pty v0.1.2
 	golang.org/x/crypto v0.31.0
 )
 
