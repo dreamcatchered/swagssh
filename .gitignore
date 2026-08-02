@@ -1,1 +1,2 @@
-dist/\n*.exe\n/opt/\n
+dist/
+*.exe
