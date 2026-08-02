@@ -209,19 +209,11 @@ func runConnect(serverAddr, sessionID string) {
 
 func getShell() []string {
 	if runtime.GOOS == "windows" {
-		if comspec := os.Getenv("COMSPEC"); comspec != "" {
-			return []string{comspec}
+		comspec := os.Getenv("COMSPEC")
+		if comspec == "" {
+			comspec = `C:\Windows\System32\cmd.exe`
 		}
-		psPaths := []string{
-			`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`,
-			`C:\Windows\PowerShell\7\pwsh.exe`,
-		}
-		for _, p := range psPaths {
-			if _, err := os.Stat(p); err == nil {
-				return []string{p}
-			}
-		}
-		return []string{"powershell.exe"}
+		return []string{comspec, "/k"}
 	}
 
 	shell := os.Getenv("SHELL")

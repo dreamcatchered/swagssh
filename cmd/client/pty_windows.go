@@ -3,20 +3,31 @@
 package main
 
 import (
-	"io"
+	"os"
 	"os/exec"
 	"syscall"
 )
 
 type pipePty struct {
-	stdinWriter  *io.PipeWriter
-	stdoutReader *io.PipeReader
+	stdinWriter  *os.File
+	stdoutReader *os.File
+	stdinCloser  *os.File
+	stdoutCloser *os.File
 	cmd          *exec.Cmd
 }
 
 func startPTY(cmd *exec.Cmd, rows, cols int) (*pipePty, error) {
-	stdinReader, stdinWriter := io.Pipe()
-	stdoutReader, stdoutWriter := io.Pipe()
+	stdinReader, stdinWriter, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+
+	stdoutReader, stdoutWriter, err := os.Pipe()
+	if err != nil {
+		stdinReader.Close()
+		stdinWriter.Close()
+		return nil, err
+	}
 
 	cmd.Stdin = stdinReader
 	cmd.Stdout = stdoutWriter
@@ -31,9 +42,14 @@ func startPTY(cmd *exec.Cmd, rows, cols int) (*pipePty, error) {
 		return nil, err
 	}
 
+	stdinReader.Close()
+	stdoutWriter.Close()
+
 	return &pipePty{
 		stdinWriter:  stdinWriter,
 		stdoutReader: stdoutReader,
+		stdinCloser:  stdinReader,
+		stdoutCloser: stdoutWriter,
 		cmd:          cmd,
 	}, nil
 }

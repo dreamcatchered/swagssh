@@ -1,12 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>swagSSH &mdash; Instant Reverse SSH</title>
+    <title>swagSSH — Мгновенный обратный SSH</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='85' font-size='85'>*</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500&family=Inter:wght@500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500&family=Manrope:wght@500&display=swap" rel="stylesheet">
     <style>
         :root {
             --color-motto-ink: #000000;
@@ -19,16 +20,12 @@
             --color-smoke: #848484;
             --color-fog-border: #c8cacd;
             --color-pewter: #666666;
-            --font-disp: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
-            --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+            --font-disp: 'Unbounded', sans-serif;
+            --font-sans: 'Manrope', sans-serif;
             --radius-full: 9999px;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin:0; padding:0; box-sizing:border-box; }
 
         body {
             background: var(--color-parchment);
@@ -39,69 +36,55 @@
             -moz-osx-font-smoothing: grayscale;
         }
 
-        /* Top Navigation */
         nav {
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 24px 48px;
-            font-family: var(--font-sans);
-            font-weight: 500;
             font-size: 15px;
         }
 
         .nav-logo {
+            font-family: var(--font-disp);
             font-size: 18px;
             font-weight: 500;
             color: var(--color-motto-ink);
+            letter-spacing: -0.01em;
         }
 
         .nav-logo .reg {
             font-size: 0.35em;
             vertical-align: super;
             display: inline-block;
-            width: 1.4em;
-            height: 1.4em;
+            width: 1.5em; height: 1.5em;
             border: 1px solid var(--color-motto-ink);
             border-radius: 50%;
             text-align: center;
-            line-height: 1.4em;
+            line-height: 1.5em;
             margin-left: 1px;
         }
 
-        .nav-links {
-            display: flex;
-            gap: 60px;
-        }
-
-        .nav-links a {
-            color: var(--color-motto-ink);
-            text-decoration: none;
-            font-weight: 500;
-        }
+        .nav-links { display:flex; gap:60px; }
+        .nav-links a { color:var(--color-motto-ink); text-decoration:none; }
 
         .nav-right a {
             color: var(--color-motto-ink);
             text-decoration: underline;
             text-underline-offset: 4px;
-            font-weight: 500;
         }
 
-        /* Hero Section */
         .hero {
             padding: 96px 48px 77px;
             text-align: center;
         }
 
         .hero-overline {
-            font-family: var(--font-sans);
             font-size: 17px;
             color: var(--color-slate);
             margin-bottom: 38px;
             text-align: left;
             max-width: 1280px;
-            margin-left: auto;
-            margin-right: auto;
+            margin-left: auto; margin-right: auto;
         }
 
         .hero-headline {
@@ -110,21 +93,16 @@
             font-size: clamp(61px, 10vw, 120px);
             line-height: 1.0;
             color: var(--color-motto-ink);
-            max-width: 1000px;
+            max-width: 1080px;
             margin: 0 auto 19px;
-            letter-spacing: -0.02em;
-        }
-
-        .hero-headline .asterisk {
-            display: inline-block;
-            font-family: var(--font-disp);
+            letter-spacing: -0.03em;
+            text-transform: uppercase;
         }
 
         .hero-subtitle {
-            font-family: var(--font-sans);
             font-size: 18px;
             color: var(--color-graphite);
-            max-width: 560px;
+            max-width: 580px;
             margin: 0 auto 58px;
             line-height: 1.6;
         }
@@ -138,45 +116,15 @@
             font-size: 15px;
         }
 
-        .scroll-arrow {
-            font-size: 48px;
-            color: var(--color-motto-ink);
-        }
+        .scroll-arrow { font-size:48px; color:var(--color-motto-ink); }
+        .scroll-text { color:var(--color-smoke); font-size:14px; text-decoration:underline; text-underline-offset:4px; }
 
-        .scroll-text {
-            color: var(--color-smoke);
-            font-size: 14px;
-            text-decoration: underline;
-            text-underline-offset: 4px;
-        }
+        hr { border:none; border-top:1px solid var(--color-ash-rule); margin:0; }
 
-        /* Divider */
-        hr {
-            border: none;
-            border-top: 1px solid var(--color-ash-rule);
-            margin: 0;
-        }
+        .oneliner-section { padding: 77px 48px; }
+        .oneliner-container { max-width:1280px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:24px; }
 
-        /* One-Liner Section */
-        .oneliner-section {
-            padding: 77px 48px;
-        }
-
-        .oneliner-container {
-            max-width: 1280px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-        }
-
-        .oneliner-card {
-            background: var(--color-bone-paper);
-            padding: 29px;
-            border-radius: 0;
-            border: none;
-            box-shadow: none;
-        }
+        .oneliner-card { background: var(--color-bone-paper); padding: 29px; }
 
         .oneliner-label {
             font-family: var(--font-disp);
@@ -194,22 +142,18 @@
             font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
             font-size: 14px;
             line-height: 1.5;
-            border-radius: 0;
             overflow-x: auto;
             position: relative;
             cursor: pointer;
             transition: background 0.15s ease;
         }
 
-        .oneliner-code:hover {
-            background: var(--color-motto-ink);
-        }
+        .oneliner-code:hover { background: var(--color-motto-ink); }
 
         .oneliner-code::after {
-            content: 'Click to copy';
+            content: 'Нажмите чтобы скопировать';
             position: absolute;
-            top: 8px;
-            right: 16px;
+            top: 8px; right: 16px;
             font-family: var(--font-sans);
             font-size: 11px;
             color: var(--color-smoke);
@@ -218,24 +162,11 @@
             pointer-events: none;
         }
 
-        .oneliner-code:hover::after {
-            opacity: 1;
-        }
+        .oneliner-code:hover::after { opacity: 1; }
+        .oneliner-code.copied::after { content: 'Скопировано!'; opacity: 1; }
 
-        .oneliner-code.copied::after {
-            content: 'Copied!';
-            opacity: 1;
-        }
-
-        /* Features Section */
-        .features-section {
-            padding: 77px 48px;
-        }
-
-        .features-container {
-            max-width: 1280px;
-            margin: 0 auto;
-        }
+        .features-section { padding: 77px 48px; }
+        .features-container { max-width:1280px; margin:0 auto; }
 
         .features-heading {
             font-family: var(--font-disp);
@@ -246,23 +177,11 @@
             margin-bottom: 48px;
         }
 
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 23px;
-        }
+        .features-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:23px; }
 
-        .feature-card {
-            background: var(--color-bone-paper);
-            padding: 29px;
-            border-radius: 0;
-            border: none;
-            box-shadow: none;
-        }
+        .feature-card { background: var(--color-bone-paper); padding: 29px; }
 
         .feature-title {
-            font-family: var(--font-sans);
-            font-weight: 500;
             font-size: 20px;
             color: var(--color-motto-ink);
             margin-bottom: 15px;
@@ -270,104 +189,45 @@
         }
 
         .feature-desc {
-            font-family: var(--font-sans);
-            font-weight: 500;
             font-size: 15px;
             color: var(--color-slate);
             line-height: 1.6;
         }
 
-        /* How It Works */
-        .how-section {
-            padding: 77px 48px;
-        }
-
-        .how-container {
-            max-width: 1280px;
-            margin: 0 auto;
-        }
+        .how-section { padding: 77px 48px; }
+        .how-container { max-width:1280px; margin:0 auto; }
 
         .how-heading {
             font-family: var(--font-disp);
             font-weight: 500;
             font-size: clamp(48px, 6vw, 80px);
             line-height: 1.1;
-            color: var(--color-motto-ink);
             margin-bottom: 48px;
         }
 
-        .how-steps {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 23px;
-        }
+        .how-steps { display:grid; grid-template-columns:repeat(3,1fr); gap:23px; }
 
-        .how-step {
-            background: var(--color-bone-paper);
-            padding: 29px;
-            border-radius: 0;
-        }
+        .how-step { background: var(--color-bone-paper); padding: 29px; }
 
         .how-step-num {
             font-family: var(--font-disp);
-            font-weight: 500;
             font-size: 61px;
             line-height: 1.0;
-            color: var(--color-motto-ink);
             margin-bottom: 15px;
         }
 
         .how-step-title {
-            font-family: var(--font-sans);
-            font-weight: 500;
             font-size: 18px;
-            color: var(--color-motto-ink);
             margin-bottom: 8px;
             line-height: 1.4;
         }
 
         .how-step-desc {
-            font-family: var(--font-sans);
-            font-weight: 500;
             font-size: 15px;
             color: var(--color-slate);
             line-height: 1.6;
         }
 
-        /* Status Badge */
-        .status-section {
-            padding: 0 48px 77px;
-        }
-
-        .status-container {
-            max-width: 1280px;
-            margin: 0 auto;
-            display: flex;
-            gap: 19px;
-        }
-
-        .pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            border-radius: var(--radius-full);
-            padding: 8px 19px;
-            font-family: var(--font-sans);
-            font-weight: 500;
-            font-size: 14px;
-            border: 1px solid var(--color-ash-rule);
-            background: transparent;
-            color: var(--color-motto-ink);
-        }
-
-        .pill-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #22c55e;
-        }
-
-        /* Footer */
         footer {
             background: var(--color-soft-carbon);
             padding: 67px 48px;
@@ -385,105 +245,88 @@
         }
 
         .footer-brand {
-            font-family: var(--font-sans);
-            font-weight: 500;
+            font-family: var(--font-disp);
             font-size: 18px;
+            letter-spacing: -0.01em;
         }
 
         .footer-brand .reg {
             font-size: 0.35em;
             vertical-align: super;
             display: inline-block;
-            width: 1.4em;
-            height: 1.4em;
+            width: 1.5em; height: 1.5em;
             border: 1px solid var(--color-bone-paper);
             border-radius: 50%;
             text-align: center;
-            line-height: 1.4em;
+            line-height: 1.5em;
             margin-left: 1px;
         }
 
-        .footer-links {
-            display: flex;
-            gap: 48px;
-        }
+        .footer-links { display:flex; gap:48px; }
 
         .footer-links a {
             color: var(--color-smoke);
             text-decoration: none;
-            font-family: var(--font-sans);
-            font-weight: 500;
             font-size: 14px;
             transition: color 0.15s ease;
         }
 
-        .footer-links a:hover {
+        .footer-links a:hover { color: var(--color-bone-paper); }
+
+        .footer-github {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
             color: var(--color-bone-paper);
+            text-decoration: underline;
+            text-underline-offset: 4px;
+            font-size: 15px;
         }
 
-        /* Responsive */
-        @media (max-width: 900px) {
-            .oneliner-container,
-            .features-grid,
-            .how-steps {
-                grid-template-columns: 1fr;
-            }
-            .hero {
-                padding: 58px 24px 48px;
-            }
-            .features-section,
-            .how-section,
-            .oneliner-section {
-                padding: 48px 24px;
-            }
-            nav {
-                padding: 24px 24px;
-            }
-            .nav-links {
-                display: none;
-            }
-            footer {
-                padding: 48px 24px;
-            }
+        .footer-github:hover { color: var(--color-bone-paper); }
+
+        @media (max-width:900px) {
+            .oneliner-container, .features-grid, .how-steps { grid-template-columns:1fr; }
+            .hero { padding:58px 24px 48px; }
+            .features-section, .how-section, .oneliner-section { padding:48px 24px; }
+            nav { padding:24px 24px; }
+            .nav-links { display:none; }
+            footer { padding:48px 24px; }
         }
 
-        @media (max-width: 600px) {
-            .hero-headline {
-                font-size: clamp(40px, 12vw, 61px);
-            }
-            .footer-container {
-                flex-direction: column;
-            }
+        @media (max-width:600px) {
+            .hero-headline { font-size:clamp(40px,12vw,61px); }
+            .footer-container { flex-direction:column; }
         }
     </style>
 </head>
 <body>
 
 <nav>
-    <div class="nav-logo">swag<span class="reg">R</span></div>
+    <div class="nav-logo">swagSSH<span class="reg">R</span></div>
     <div class="nav-links">
-        <a href="#features">Features</a>
-        <a href="#how">How It Works</a>
-        <a href="#install">Install</a>
+        <a href="#features">Возможности</a>
+        <a href="#how">Как работает</a>
+        <a href="#install">Установка</a>
     </div>
     <div class="nav-right">
-        <a href="https://github.com">Source</a>
+        <a href="https://github.com/dreamcatchered/swagssh">GitHub</a>
     </div>
 </nav>
 
 <main>
     <section class="hero">
-        <div class="hero-overline">Self-hosted &bull; Zero config &bull; One command</div>
+        <div class="hero-overline">Self-hosted &bull; Без конфигурации &bull; Одна команда</div>
         <h1 class="hero-headline">
-            <span class="asterisk">*</span> Instant<br>Reverse SSH
+            <span>*</span> Мгновенный<br>Обратный SSH
         </h1>
         <p class="hero-subtitle">
-            Connect to any computer behind NAT or firewall with a single command.
-            No port forwarding. No VPN. No Tailscale. Just pure SSH magic through your own server.
+            Подключайтесь к любому компьютеру за NAT и файрволом одной командой.
+            Без проброса портов. Без VPN. Без Tailscale. Чистый SSH через ваш собственный сервер.
         </p>
         <div class="scroll-indicator">
             <span class="scroll-arrow">&darr;</span>
-            <span class="scroll-text">SCROLL</span>
+            <span class="scroll-text">ЛИСТАЙТЕ</span>
         </div>
     </section>
 
@@ -510,31 +353,31 @@
 
     <section class="features-section" id="features">
         <div class="features-container">
-            <h2 class="features-heading">Features<span class="asterisk">*</span></h2>
+            <h2 class="features-heading">Возможности<span>*</span></h2>
             <div class="features-grid">
                 <div class="feature-card">
-                    <div class="feature-title">One Command</div>
-                    <div class="feature-desc">No installers, no configuration, no signup. Just paste a one-liner and share your terminal instantly.</div>
+                    <div class="feature-title">Одна команда</div>
+                    <div class="feature-desc">Никаких установщиков, настроек и регистраций. Просто скопируйте одну строку и ваш терминал готов к передаче.</div>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-title">NAT Traversal</div>
-                    <div class="feature-desc">Works through firewalls, CG-NAT, and restrictive networks. Only outbound connections are used.</div>
+                    <div class="feature-title">Обход NAT</div>
+                    <div class="feature-desc">Работает через любые файрволы, CG-NAT и ограничивающие сети. Используются только исходящие соединения.</div>
                 </div>
                 <div class="feature-card">
                     <div class="feature-title">Self-Hosted</div>
-                    <div class="feature-desc">All traffic goes through your own server. No third party sees your sessions. Full control and privacy.</div>
+                    <div class="feature-desc">Весь трафик проходит через ваш собственный сервер. Никакие третьи лица не видят ваши сессии. Полный контроль и конфиденциальность.</div>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-title">Cross-Platform</div>
-                    <div class="feature-desc">Native support for Windows (ConPTY), Linux, and macOS. Single binary, zero dependencies.</div>
+                    <div class="feature-title">Кроссплатформенность</div>
+                    <div class="feature-desc">Нативная поддержка Windows, Linux и macOS. Один бинарный файл, ноль зависимостей.</div>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-title">End-to-End Encryption</div>
-                    <div class="feature-desc">All connections use SSH with Ed25519 keys. Sessions are ephemeral with automatic TTL cleanup.</div>
+                    <div class="feature-title">Сквозное шифрование</div>
+                    <div class="feature-desc">Все соединения используют SSH с Ed25519 ключами. Сессии эфемерны с автоматической TTL-очисткой.</div>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-title">Interactive Terminal</div>
-                    <div class="feature-desc">Full PTY support with resize handling. Works with vim, htop, tmux, PowerShell, and any TUI application.</div>
+                    <div class="feature-title">Интерактивный терминал</div>
+                    <div class="feature-desc">Полная поддержка PTY с автоизменением размера окна. Работает с vim, htop, tmux, PowerShell и любыми TUI-приложениями.</div>
                 </div>
             </div>
         </div>
@@ -544,22 +387,22 @@
 
     <section class="how-section" id="how">
         <div class="how-container">
-            <h2 class="how-heading">How It Works</h2>
+            <h2 class="how-heading">Как работает</h2>
             <div class="how-steps">
                 <div class="how-step">
                     <div class="how-step-num">1</div>
-                    <div class="how-step-title">Share Your Terminal</div>
-                    <div class="how-step-desc">Run the one-liner on the target machine. swagSSH establishes an outbound SSH connection and receives a short session ID like swag-a8f2d1.</div>
+                    <div class="how-step-title">Поделитесь терминалом</div>
+                    <div class="how-step-desc">Запустите одну команду на целевом компьютере. swagSSH установит исходящее SSH-соединение и выдаст короткий ID сессии, например swag-a8f2d1.</div>
                 </div>
                 <div class="how-step">
                     <div class="how-step-num">2</div>
-                    <div class="how-step-title">Connect From Anywhere</div>
-                    <div class="how-step-desc">The operator runs swagssh connect swag-a8f2d1. The relay server bridges the two connections instantly.</div>
+                    <div class="how-step-title">Подключитесь откуда угодно</div>
+                    <div class="how-step-desc">Оператор выполняет swagssh connect swag-a8f2d1. Релей-сервер мгновенно связывает два исходящих соединения.</div>
                 </div>
                 <div class="how-step">
                     <div class="how-step-num">3</div>
-                    <div class="how-step-title">Full Terminal Control</div>
-                    <div class="how-step-desc">Get an interactive shell with the target user's permissions. Resize your window and it syncs. Session auto-expires after 1 hour.</div>
+                    <div class="how-step-title">Полный контроль</div>
+                    <div class="how-step-desc">Вы получаете интерактивный терминал с правами пользователя целевой машины. Размер окна синхронизируется. Сессия истекает через 1 час.</div>
                 </div>
             </div>
         </div>
@@ -567,39 +410,35 @@
 
     <hr>
 
-    <section class="status-section">
-        <div class="status-container">
-            <div class="pill">
-                <span class="pill-dot"></span>
-                Server Online
-            </div>
-            <div class="pill">ssh.swag.best:2222</div>
-            <div class="pill">Ed25519</div>
-        </div>
-    </section>
-
 </main>
 
 <footer>
     <div class="footer-container">
-        <div class="footer-brand">swag<span class="reg">R</span></div>
+        <div class="footer-brand">swagSSH<span class="reg">R</span></div>
         <div class="footer-links">
-            <a href="#features">Features</a>
-            <a href="#how">How It Works</a>
-            <a href="#install">Install</a>
-            <a href="https://github.com">GitHub</a>
+            <a href="#features">Возможности</a>
+            <a href="#how">Как работает</a>
+            <a href="#install">Установка</a>
+        </div>
+        <div>
+            <a class="footer-github" href="https://github.com/dreamcatchered/swagssh">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                GitHub
+            </a>
         </div>
     </div>
 </footer>
 
 <script>
     function copyCode(el) {
-        const text = el.getAttribute('data-copy');
-        navigator.clipboard.writeText(text).then(() => {
-            el.classList.add('copied');
-            setTimeout(() => el.classList.remove('copied'), 2000);
-        }).catch(() => {
-            const ta = document.createElement('textarea');
+        var text = el.getAttribute('data-copy');
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(function() {
+                el.classList.add('copied');
+                setTimeout(function() { el.classList.remove('copied'); }, 2000);
+            });
+        } else {
+            var ta = document.createElement('textarea');
             ta.value = text;
             ta.style.position = 'fixed';
             ta.style.opacity = '0';
@@ -608,8 +447,8 @@
             document.execCommand('copy');
             document.body.removeChild(ta);
             el.classList.add('copied');
-            setTimeout(() => el.classList.remove('copied'), 2000);
-        });
+            setTimeout(function() { el.classList.remove('copied'); }, 2000);
+        }
     }
 </script>
 
