@@ -17,6 +17,8 @@ import (
 )
 
 func main() {
+	log.SetFlags(0)
+
 	if len(os.Args) < 2 {
 		usage()
 	}
@@ -54,8 +56,8 @@ func main() {
 func usage() {
 	fmt.Fprintf(os.Stderr, "swagSSH - Instant Reverse SSH\n\n")
 	fmt.Fprintf(os.Stderr, "Usage:\n")
-	fmt.Fprintf(os.Stderr, "  swagssh share [--server HOST:PORT]           Share terminal (creates session ID)\n")
-	fmt.Fprintf(os.Stderr, "  swagssh connect [--server HOST:PORT] <ID>    Connect to shared session\n")
+	fmt.Fprintf(os.Stderr, "  swagssh share [--server HOST:PORT]\n")
+	fmt.Fprintf(os.Stderr, "  swagssh connect [--server HOST:PORT] <session-id>\n")
 	os.Exit(1)
 }
 
@@ -81,7 +83,7 @@ func runShare(serverAddr string) {
 
 	go ssh.DiscardRequests(requests)
 
-	bannerBuf := make([]byte, 4096)
+	bannerBuf := make([]byte, 8192)
 	n, _ := channel.Read(bannerBuf)
 	if n > 0 {
 		fmt.Fprint(os.Stderr, string(bannerBuf[:n]))
@@ -97,22 +99,21 @@ func runShare(serverAddr string) {
 	}
 	defer ptyRW.Close()
 
-	go func() {
-		sigCh := make(chan os.Signal, 1)
-		notifyWinch(sigCh)
-		for range sigCh {
-		}
-	}()
-
 	errCh := make(chan error, 3)
 
 	go func() {
-		_, e := io.Copy(channel, ptyRW)
+		n, e := io.Copy(channel, ptyRW)
+		if e != nil && e != io.EOF {
+			log.Printf("[share] pty->channel closed after %d bytes: %v", n, e)
+		}
 		errCh <- e
 	}()
 
 	go func() {
-		_, e := io.Copy(ptyRW, channel)
+		n, e := io.Copy(ptyRW, channel)
+		if e != nil && e != io.EOF {
+			log.Printf("[share] channel->pty closed after %d bytes: %v", n, e)
+		}
 		errCh <- e
 	}()
 
@@ -120,7 +121,10 @@ func runShare(serverAddr string) {
 		errCh <- cmd.Wait()
 	}()
 
-	<-errCh
+	err = <-errCh
+	if err != nil && err != io.EOF {
+		log.Printf("[share] session ended: %v", err)
+	}
 }
 
 func runConnect(serverAddr, sessionID string) {
@@ -133,64 +137,66 @@ func runConnect(serverAddr, sessionID string) {
 
 	client, err := ssh.Dial("tcp", serverAddr, config)
 	if err != nil {
-		log.Fatalf("Failed to connect to session %s: %v", sessionID, err)
+		log.Fatalf("Failed to connect: %v", err)
 	}
 	defer client.Close()
 
 	channel, requests, err := client.OpenChannel("session", nil)
 	if err != nil {
-		log.Fatalf("Failed to open channel: %v", err)
+		log.Fatalf("Session not found or already closed: %v", err)
 	}
 	defer channel.Close()
 
 	go ssh.DiscardRequests(requests)
 
 	fd := int(os.Stdin.Fd())
-	if !term.IsTerminal(fd) {
-		log.Fatal("This command must be run from an interactive terminal")
-	}
+	istty := term.IsTerminal(fd)
+	var oldState *term.State
 
-	oldState, err := term.MakeRaw(fd)
-	if err != nil {
-		log.Fatalf("Failed to set raw mode: %v", err)
-	}
-	defer term.Restore(fd, oldState)
+	if istty {
+		var err error
+		oldState, err = term.MakeRaw(fd)
+		if err == nil {
+			defer term.Restore(fd, oldState)
+		}
 
-	w, h, _ := term.GetSize(fd)
-
-	go func() {
-		sigCh := make(chan os.Signal, 1)
-		notifyWinch(sigCh)
-		for range sigCh {
-			nw, nh, err := term.GetSize(fd)
-			if err != nil {
-				continue
-			}
+		w, h, _ := term.GetSize(fd)
+		if w > 0 && h > 0 {
 			payload := make([]byte, 16)
-			binary.BigEndian.PutUint32(payload[0:4], uint32(nw))
-			binary.BigEndian.PutUint32(payload[4:8], uint32(nh))
+			binary.BigEndian.PutUint32(payload[0:4], uint32(w))
+			binary.BigEndian.PutUint32(payload[4:8], uint32(h))
 			binary.BigEndian.PutUint32(payload[8:12], 0)
 			binary.BigEndian.PutUint32(payload[12:16], 0)
 			_, _, _ = client.SendRequest("window-change", false, payload)
 		}
-	}()
+
+		go func() {
+			sigCh := make(chan os.Signal, 1)
+			notifyWinch(sigCh)
+			for range sigCh {
+				nw, nh, err := term.GetSize(fd)
+				if err != nil {
+					continue
+				}
+				payload := make([]byte, 16)
+				binary.BigEndian.PutUint32(payload[0:4], uint32(nw))
+				binary.BigEndian.PutUint32(payload[4:8], uint32(nh))
+				binary.BigEndian.PutUint32(payload[8:12], 0)
+				binary.BigEndian.PutUint32(payload[12:16], 0)
+				_, _, _ = client.SendRequest("window-change", false, payload)
+			}
+		}()
+	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigCh
-		term.Restore(fd, oldState)
+		if istty && oldState != nil {
+			term.Restore(fd, oldState)
+		}
 		os.Exit(0)
 	}()
-
-	if w > 0 && h > 0 {
-		payload := make([]byte, 16)
-		binary.BigEndian.PutUint32(payload[0:4], uint32(w))
-		binary.BigEndian.PutUint32(payload[4:8], uint32(h))
-		binary.BigEndian.PutUint32(payload[8:12], 0)
-		binary.BigEndian.PutUint32(payload[12:16], 0)
-		_, _, _ = client.SendRequest("window-change", false, payload)
-	}
 
 	errCh := make(chan error, 2)
 
@@ -204,7 +210,10 @@ func runConnect(serverAddr, sessionID string) {
 		errCh <- e
 	}()
 
-	<-errCh
+	e := <-errCh
+	if e != nil && e != io.EOF {
+		log.Printf("[connect] connection ended: %v", e)
+	}
 }
 
 func getShell() []string {
@@ -224,7 +233,6 @@ func getShell() []string {
 			shell = "/bin/sh"
 		}
 	}
-
 	if shell == "" {
 		return []string{"/bin/sh"}
 	}

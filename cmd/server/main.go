@@ -38,10 +38,10 @@ type Session struct {
 }
 
 type Server struct {
-	config     *ssh.ServerConfig
-	sessions   sync.Map
-	port       string
-	hostKey    string
+	config        *ssh.ServerConfig
+	sessions      sync.Map
+	port          string
+	hostKey       string
 	totalSessions atomic.Int64
 }
 
@@ -109,7 +109,6 @@ func NewServer(port, hostKeyPath string) (*Server, error) {
 	config := &ssh.ServerConfig{
 		NoClientAuth: true,
 	}
-
 	config.AddHostKey(signer)
 
 	s := &Server{
@@ -128,21 +127,29 @@ func (s *Server) cleanupLoop() {
 	defer ticker.Stop()
 	for range ticker.C {
 		now := time.Now()
+		var activeCount int
 		s.sessions.Range(func(key, value interface{}) bool {
 			sess := value.(*Session)
 			if now.Sub(sess.CreatedAt) > sessionTTL {
+				log.Printf("[cleanup] TTL expired: %s", sess.ID)
 				sess.Close()
+				s.sessions.Delete(key)
+			} else if !sess.closed.Load() {
+				activeCount++
 			}
 			return true
 		})
-		log.Printf("[cleanup] Active sessions: %d", s.sessionCount())
+		log.Printf("[cleanup] Active sessions: %d", activeCount)
 	}
 }
 
 func (s *Server) sessionCount() int {
 	count := 0
-	s.sessions.Range(func(_, _ interface{}) bool {
-		count++
+	s.sessions.Range(func(_, value interface{}) bool {
+		sess := value.(*Session)
+		if !sess.closed.Load() {
+			count++
+		}
 		return true
 	})
 	return count
@@ -157,7 +164,6 @@ func (s *Server) Start() error {
 	defer listener.Close()
 
 	log.Printf("[*] swagSSH relay server listening on %s", addr)
-	log.Printf("[*] Active sessions: %d", s.sessionCount())
 
 	for {
 		conn, err := listener.Accept()
@@ -165,7 +171,6 @@ func (s *Server) Start() error {
 			log.Printf("[!] Accept error: %v", err)
 			continue
 		}
-
 		go s.handleConnection(conn)
 	}
 }
@@ -192,6 +197,33 @@ func (s *Server) handleConnection(netConn net.Conn) {
 	}
 }
 
+func bannerBox(sessionID string) string {
+	line := strings.Repeat("═", 50)
+	idLine := fmt.Sprintf("Session ID: %s", sessionID)
+	connLine := fmt.Sprintf("swagssh connect %s", sessionID)
+
+	b := fmt.Sprintf("\033[1;36m╔%s╗\033[0m\n", line)
+	b += fmt.Sprintf("\033[1;36m║\033[0m  \033[1;32mswagSSH Session Ready\033[0m%s\033[1;36m║\033[0m\n", spaces(48-24))
+	b += fmt.Sprintf("\033[1;36m║\033[0m  %s%s\033[1;36m║\033[0m\n", "", spaces(48))
+	b += fmt.Sprintf("\033[1;36m║\033[0m  \033[1;33m%s\033[0m%s\033[1;36m║\033[0m\n", idLine, spaces(48-2-len(idLine)))
+	b += fmt.Sprintf("\033[1;36m║\033[0m  %s%s\033[1;36m║\033[0m\n", "", spaces(48))
+	b += fmt.Sprintf("\033[1;36m║\033[0m  \033[1m%s\033[0m%s\033[1;36m║\033[0m\n", connLine, spaces(48-2-len(connLine)))
+	b += fmt.Sprintf("\033[1;36m║\033[0m  %s%s\033[1;36m║\033[0m\n", "", spaces(48))
+	b += fmt.Sprintf("\033[1;36m╚%s╝\033[0m\n", line)
+	return b
+}
+
+func spaces(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	s := make([]byte, n)
+	for i := range s {
+		s[i] = ' '
+	}
+	return string(s)
+}
+
 func (s *Server) handleShare(sshConn *ssh.ServerConn, chans <-chan ssh.NewChannel) {
 	for newChannel := range chans {
 		if newChannel.ChannelType() != "session" {
@@ -204,7 +236,6 @@ func (s *Server) handleShare(sshConn *ssh.ServerConn, chans <-chan ssh.NewChanne
 			log.Printf("[!] Accept channel error: %v", err)
 			return
 		}
-
 		go ssh.DiscardRequests(requests)
 
 		sessionID := generateSessionID()
@@ -229,26 +260,25 @@ func (s *Server) handleShare(sshConn *ssh.ServerConn, chans <-chan ssh.NewChanne
 
 		log.Printf("[+] Session created: %s from %s (total: %d)", sessionID, sshConn.RemoteAddr(), s.sessionCount())
 
-		sendMsg := fmt.Sprintf("\033[1;36m╔══════════════════════════════════════════╗\n\033[0m")
-		sendMsg += fmt.Sprintf("\033[1;36m║\033[0m     \033[1;32mswagSSH Session Ready\033[0m             \033[1;36m║\033[0m\n")
-		sendMsg += fmt.Sprintf("\033[1;36m║\033[0m                                          \033[1;36m║\033[0m\n")
-		sendMsg += fmt.Sprintf("\033[1;36m║\033[0m  Session ID: \033[1;33m%s\033[0m                 \033[1;36m║\033[0m\n", sessionID)
-		sendMsg += fmt.Sprintf("\033[1;36m║\033[0m                                          \033[1;36m║\033[0m\n")
-		sendMsg += fmt.Sprintf("\033[1;36m║\033[0m  Connect: \033[1mswagssh connect %s\033[0m         \033[1;36m║\033[0m\n", sessionID)
-		sendMsg += fmt.Sprintf("\033[1;36m║\033[0m                                          \033[1;36m║\033[0m\n")
-		sendMsg += fmt.Sprintf("\033[1;36m╚══════════════════════════════════════════╝\033[0m\n")
-		channel.Write([]byte(sendMsg))
+		channel.Write([]byte(bannerBox(sessionID)))
 
-		select {
-		case opChannel := <-sess.operator:
-			s.bridge(sess, opChannel)
-		case <-sess.done:
-			return
-		case <-time.After(sessionTTL):
-			sess.Close()
-			return
+		for {
+			select {
+			case opChannel := <-sess.operator:
+				log.Printf("[bridge] Operator connected to %s", sessionID)
+				s.bridge(sess, opChannel)
+				log.Printf("[bridge] Operator disconnected from %s", sessionID)
+			case <-sess.done:
+				log.Printf("[-] Session ended: %s", sessionID)
+				s.sessions.Delete(sessionID)
+				return
+			case <-time.After(sessionTTL):
+				log.Printf("[cleanup] Session %s expired (1h TTL)", sessionID)
+				sess.Close()
+				s.sessions.Delete(sessionID)
+				return
+			}
 		}
-		return
 	}
 }
 
@@ -276,22 +306,22 @@ func (s *Server) handleConnect(sshConn *ssh.ServerConn, chans <-chan ssh.NewChan
 			log.Printf("[!] Accept operator channel error: %v", err)
 			return
 		}
-
 		go s.handleOperatorRequests(sess, requests)
 
 		log.Printf("[+] Operator connected to session %s from %s", sessionID, sshConn.RemoteAddr())
 
 		select {
 		case sess.operator <- channel:
+			log.Printf("[bridge] Operator channel handed off for %s", sessionID)
 		case <-sess.done:
+			channel.Write([]byte("\033[1;31mSession ended\033[0m\n"))
 			channel.Close()
 			return
 		case <-time.After(10 * time.Second):
-			channel.Write([]byte("\033[1;31mSession connection timed out\033[0m\n"))
+			channel.Write([]byte("\033[1;31mConnection timed out\033[0m\n"))
 			channel.Close()
 			return
 		}
-
 		return
 	}
 }
@@ -300,20 +330,16 @@ func (s *Server) handleOperatorRequests(sess *Session, requests <-chan *ssh.Requ
 	for req := range requests {
 		switch req.Type {
 		case "window-change":
+			sess.mu.Lock()
 			if sess.Channel != nil {
-				sess.mu.Lock()
-				ok, err := sess.Channel.SendRequest("window-change", req.WantReply, req.Payload)
-				sess.mu.Unlock()
+				_, err := sess.Channel.SendRequest("window-change", req.WantReply, req.Payload)
 				if req.WantReply {
-					if err != nil {
-						req.Reply(false, nil)
-					} else {
-						req.Reply(ok, nil)
-					}
+					req.Reply(err == nil, nil)
 				}
 			} else if req.WantReply {
 				req.Reply(false, nil)
 			}
+			sess.mu.Unlock()
 		default:
 			if req.WantReply {
 				req.Reply(false, nil)
@@ -323,21 +349,24 @@ func (s *Server) handleOperatorRequests(sess *Session, requests <-chan *ssh.Requ
 }
 
 func (s *Server) bridge(sess *Session, opChannel ssh.Channel) {
-	defer sess.Close()
-
 	defer opChannel.Close()
-	defer sess.Channel.Close()
 
 	opDone := make(chan struct{}, 1)
 	shareDone := make(chan struct{}, 1)
 
 	go func() {
-		io.Copy(sess.Channel, opChannel)
+		n, err := io.Copy(sess.Channel, opChannel)
+		if err != nil && err != io.EOF {
+			log.Printf("[bridge] operator->share error after %d bytes: %v", n, err)
+		}
 		close(opDone)
 	}()
 
 	go func() {
-		io.Copy(opChannel, sess.Channel)
+		n, err := io.Copy(opChannel, sess.Channel)
+		if err != nil && err != io.EOF {
+			log.Printf("[bridge] share->operator error after %d bytes: %v", n, err)
+		}
 		close(shareDone)
 	}()
 
@@ -363,7 +392,7 @@ func (s *Session) Close() {
 
 func main() {
 	port := flag.String("port", "2222", "Port to listen on")
-	hostKey := flag.String("host-key", "", "Path to host key file (Ed25519 encoded in OpenSSH format, generated if missing)")
+	hostKey := flag.String("host-key", "", "Path to Ed25519 host key file")
 
 	flag.Parse()
 
