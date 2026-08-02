@@ -32,9 +32,14 @@ type Session struct {
 	Channel   ssh.Channel
 	CreatedAt time.Time
 	mu        sync.Mutex
-	operator  chan ssh.Channel
+	operator  chan operatorHandoff
 	done      chan struct{}
 	closed    atomic.Bool
+}
+
+type operatorHandoff struct {
+	channel ssh.Channel
+	done    chan struct{}
 }
 
 type Server struct {
@@ -251,12 +256,17 @@ func (s *Server) handleShare(sshConn *ssh.ServerConn, chans <-chan ssh.NewChanne
 			ShareConn: sshConn,
 			Channel:   channel,
 			CreatedAt: time.Now(),
-			operator:  make(chan ssh.Channel, 1),
+			operator:  make(chan operatorHandoff, 1),
 			done:      make(chan struct{}),
 		}
 
 		s.sessions.Store(sessionID, sess)
 		s.totalSessions.Add(1)
+
+		go func() {
+			sess.ShareConn.Wait()
+			sess.Close()
+		}()
 
 		log.Printf("[+] Session created: %s from %s (total: %d)", sessionID, sshConn.RemoteAddr(), s.sessionCount())
 
@@ -264,9 +274,9 @@ func (s *Server) handleShare(sshConn *ssh.ServerConn, chans <-chan ssh.NewChanne
 
 		for {
 			select {
-			case opChannel := <-sess.operator:
+			case handoff := <-sess.operator:
 				log.Printf("[bridge] Operator connected to %s", sessionID)
-				s.bridge(sess, opChannel)
+				s.bridge(sess, handoff)
 				log.Printf("[bridge] Operator disconnected from %s", sessionID)
 			case <-sess.done:
 				log.Printf("[-] Session ended: %s", sessionID)
@@ -310,9 +320,13 @@ func (s *Server) handleConnect(sshConn *ssh.ServerConn, chans <-chan ssh.NewChan
 
 		log.Printf("[+] Operator connected to session %s from %s", sessionID, sshConn.RemoteAddr())
 
+		handoff := operatorHandoff{channel: channel, done: make(chan struct{})}
+
 		select {
-		case sess.operator <- channel:
+		case sess.operator <- handoff:
 			log.Printf("[bridge] Operator channel handed off for %s", sessionID)
+			<-handoff.done
+			return
 		case <-sess.done:
 			channel.Write([]byte("\033[1;31mSession ended\033[0m\n"))
 			channel.Close()
@@ -348,7 +362,9 @@ func (s *Server) handleOperatorRequests(sess *Session, requests <-chan *ssh.Requ
 	}
 }
 
-func (s *Server) bridge(sess *Session, opChannel ssh.Channel) {
+func (s *Server) bridge(sess *Session, handoff operatorHandoff) {
+	opChannel := handoff.channel
+	defer close(handoff.done)
 	defer opChannel.Close()
 
 	opDone := make(chan struct{}, 1)
@@ -356,17 +372,13 @@ func (s *Server) bridge(sess *Session, opChannel ssh.Channel) {
 
 	go func() {
 		n, err := io.Copy(sess.Channel, opChannel)
-		if err != nil && err != io.EOF {
-			log.Printf("[bridge] operator->share error after %d bytes: %v", n, err)
-		}
+		log.Printf("[bridge] op->share %d bytes, err=%v", n, err)
 		close(opDone)
 	}()
 
 	go func() {
 		n, err := io.Copy(opChannel, sess.Channel)
-		if err != nil && err != io.EOF {
-			log.Printf("[bridge] share->operator error after %d bytes: %v", n, err)
-		}
+		log.Printf("[bridge] share->op %d bytes, err=%v", n, err)
 		close(shareDone)
 	}()
 

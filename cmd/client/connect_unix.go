@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -37,41 +38,21 @@ func runConnect(serverAddr, sessionID string) {
 	go ssh.DiscardRequests(requests)
 
 	fd := int(os.Stdin.Fd())
-	if !term.IsTerminal(fd) {
-		log.Fatal("Interactive terminal required")
-	}
+	isTTY := term.IsTerminal(fd)
 
-	oldState, err := term.MakeRaw(fd)
-	if err == nil {
-		defer term.Restore(fd, oldState)
-	}
-
-	w, h, _ := term.GetSize(fd)
-	if w > 0 && h > 0 {
-		payload := make([]byte, 16)
-		binary.BigEndian.PutUint32(payload[0:4], uint32(w))
-		binary.BigEndian.PutUint32(payload[4:8], uint32(h))
-		binary.BigEndian.PutUint32(payload[8:12], 0)
-		binary.BigEndian.PutUint32(payload[12:16], 0)
-		_, _, _ = client.SendRequest("window-change", false, payload)
-	}
-
-	go func() {
-		sigCh := make(chan os.Signal, 1)
-		notifyWinch(sigCh)
-		for range sigCh {
-			nw, nh, err := term.GetSize(fd)
-			if err != nil {
-				continue
-			}
-			payload := make([]byte, 16)
-			binary.BigEndian.PutUint32(payload[0:4], uint32(nw))
-			binary.BigEndian.PutUint32(payload[4:8], uint32(nh))
-			binary.BigEndian.PutUint32(payload[8:12], 0)
-			binary.BigEndian.PutUint32(payload[12:16], 0)
-			_, _, _ = client.SendRequest("window-change", false, payload)
+	if isTTY {
+		oldState, err := term.MakeRaw(fd)
+		if err == nil {
+			defer term.Restore(fd, oldState)
 		}
-	}()
+
+		initWindowSize(fd, client)
+		go watchWindowSize(fd, client)
+
+		fmt.Fprintf(os.Stderr, "[*] Connected to %s — Ctrl+C to exit\n", sessionID)
+	} else {
+		fmt.Fprintf(os.Stderr, "[*] Connected to %s (pipe mode)\n", sessionID)
+	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -80,8 +61,68 @@ func runConnect(serverAddr, sessionID string) {
 		os.Exit(0)
 	}()
 
-	errCh := make(chan error, 2)
-	go func() { _, e := io.Copy(channel, os.Stdin); errCh <- e }()
-	go func() { _, e := io.Copy(os.Stdout, channel); errCh <- e }()
-	<-errCh
+	done := make(chan struct{}, 1)
+	go func() {
+		io.Copy(os.Stdout, channel)
+		close(done)
+	}()
+
+	stdinDone := make(chan struct{}, 1)
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := os.Stdin.Read(buf)
+			if n > 0 {
+				if _, werr := channel.Write(buf[:n]); werr != nil {
+					break
+				}
+			}
+			if err != nil {
+				if err != io.EOF {
+					log.Printf("[connect] stdin: %v", err)
+				}
+				break
+			}
+		}
+		close(stdinDone)
+	}()
+
+	select {
+	case <-done:
+	case <-stdinDone:
+		if isTTY {
+			channel.CloseWrite()
+		}
+		<-done
+	}
+}
+
+func initWindowSize(fd int, client *ssh.Client) {
+	w, h, err := term.GetSize(fd)
+	if err != nil || w == 0 || h == 0 {
+		return
+	}
+	payload := make([]byte, 16)
+	binary.BigEndian.PutUint32(payload[0:4], uint32(w))
+	binary.BigEndian.PutUint32(payload[4:8], uint32(h))
+	binary.BigEndian.PutUint32(payload[8:12], 0)
+	binary.BigEndian.PutUint32(payload[12:16], 0)
+	_, _, _ = client.SendRequest("window-change", false, payload)
+}
+
+func watchWindowSize(fd int, client *ssh.Client) {
+	sigCh := make(chan os.Signal, 1)
+	notifyWinch(sigCh)
+	for range sigCh {
+		w, h, err := term.GetSize(fd)
+		if err != nil {
+			continue
+		}
+		payload := make([]byte, 16)
+		binary.BigEndian.PutUint32(payload[0:4], uint32(w))
+		binary.BigEndian.PutUint32(payload[4:8], uint32(h))
+		binary.BigEndian.PutUint32(payload[8:12], 0)
+		binary.BigEndian.PutUint32(payload[12:16], 0)
+		_, _, _ = client.SendRequest("window-change", false, payload)
+	}
 }

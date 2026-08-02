@@ -59,7 +59,22 @@ func (p *pipePty) Read(buf []byte) (int, error) {
 }
 
 func (p *pipePty) Write(buf []byte) (int, error) {
-	return p.stdinWriter.Write(buf)
+	n := len(buf)
+	out := make([]byte, 0, n)
+	for i := 0; i < len(buf); i++ {
+		if buf[i] == '\r' && (i+1 == len(buf) || buf[i+1] != '\n') {
+			out = append(out, '\n')
+		} else {
+			out = append(out, buf[i])
+		}
+	}
+	if len(out) == 0 {
+		return n, nil
+	}
+	if _, err := p.stdinWriter.Write(out); err != nil {
+		return 0, err
+	}
+	return n, nil
 }
 
 func (p *pipePty) Close() error {

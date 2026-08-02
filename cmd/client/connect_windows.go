@@ -33,27 +33,34 @@ func runConnect(serverAddr, sessionID string) {
 
 	go ssh.DiscardRequests(requests)
 
-	fmt.Fprintf(os.Stderr, "[*] Connected to %s — type commands, Enter to send, Ctrl+C to exit\n", sessionID)
+	fmt.Fprintf(os.Stderr, "[*] Connected to %s\n", sessionID)
 
+	done := make(chan struct{}, 1)
 	go func() {
 		io.Copy(os.Stdout, channel)
-		os.Exit(0)
+		close(done)
 	}()
 
-	buf := make([]byte, 4096)
-	for {
-		n, err := os.Stdin.Read(buf)
-		if n > 0 {
-			if _, werr := channel.Write(buf[:n]); werr != nil {
-				log.Printf("[connect] write error: %v", werr)
-				return
+	stdinDone := make(chan struct{}, 1)
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := os.Stdin.Read(buf)
+			if n > 0 {
+				if _, werr := channel.Write(buf[:n]); werr != nil {
+					break
+				}
+			}
+			if err != nil {
+				break
 			}
 		}
-		if err != nil {
-			if err != io.EOF {
-				log.Printf("[connect] read error: %v", err)
-			}
-			return
-		}
+		close(stdinDone)
+	}()
+
+	select {
+	case <-done:
+	case <-stdinDone:
+		<-done
 	}
 }

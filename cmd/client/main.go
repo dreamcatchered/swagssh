@@ -95,22 +95,21 @@ func runShare(serverAddr string) {
 	}
 	defer ptyRW.Close()
 
-	errCh := make(chan error, 3)
+	errCh := make(chan error, 2)
 
 	go func() {
-		n, e := io.Copy(channel, ptyRW)
+		_, e := io.Copy(channel, ptyRW)
 		if e != nil && e != io.EOF {
-			log.Printf("[share] pty->channel closed after %d bytes: %v", n, e)
+			log.Printf("[share] pty->channel: %v", e)
 		}
 		errCh <- e
 	}()
 
 	go func() {
-		n, e := io.Copy(ptyRW, channel)
+		_, e := io.Copy(ptyRW, channel)
 		if e != nil && e != io.EOF {
-			log.Printf("[share] channel->pty closed after %d bytes: %v", n, e)
+			log.Printf("[share] channel->pty: %v", e)
 		}
-		errCh <- e
 	}()
 
 	go func() {
@@ -141,7 +140,7 @@ func getShell() []string {
 		}
 	}
 	if shell == "" {
-		return []string{"/bin/sh"}
+		return []string{"/bin/sh", "-i"}
 	}
-	return []string{shell}
+	return []string{shell, "-i"}
 }
